@@ -25,3 +25,4 @@ func InitLogger(env string) *slog.Logger {
 	slog.SetDefault(l)
 	return l
 }
+

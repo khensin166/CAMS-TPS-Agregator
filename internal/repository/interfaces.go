@@ -58,3 +58,4 @@ type Repository interface {
 	CalculateAndSaveSummary(ctx context.Context, appName, sourceName, periodType string, start, end time.Time) (*SummaryRecord, error)
 	LogWorkerEvent(ctx context.Context, sourceName, eventType, message string, lagSeconds *int) error
 }
+

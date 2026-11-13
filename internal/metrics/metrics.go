@@ -95,3 +95,4 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 
 	return m
 }
+

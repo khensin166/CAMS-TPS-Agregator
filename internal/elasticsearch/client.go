@@ -192,3 +192,4 @@ func (c *HTTPClient) setAuth(req *http.Request) {
 		req.SetBasicAuth(c.username, c.password)
 	}
 }
+

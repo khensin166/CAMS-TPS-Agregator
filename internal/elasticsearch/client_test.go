@@ -65,3 +65,4 @@ func TestHTTPClient_Query1sHistogram(t *testing.T) {
 		t.Errorf("expected failed doc_count 5, got %d", bucket.Failed.DocCount)
 	}
 }
+

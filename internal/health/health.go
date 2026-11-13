@@ -127,3 +127,4 @@ func (c *Checker) Router() http.Handler {
 
 	return mux
 }
+

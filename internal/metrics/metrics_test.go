@@ -25,3 +25,4 @@ func TestMetrics_Initialization(t *testing.T) {
 		t.Fatalf("expected registered metric families, got 0")
 	}
 }
+

@@ -18,3 +18,4 @@ func TestInitLogger(t *testing.T) {
 	}
 	prodLog.Info("test prod log", slog.String("key", "val"))
 }
+
