@@ -20,40 +20,94 @@ Source Cloud: `10.212.224.172:9200`
 
 ## 2. Struktur Dokumen Transaksi Nyata (`cams-service-*`)
 
-Berdasarkan sampel dokumen asli dari index `cams-service-2026.11.13`:
+Berdasarkan sampel dokumen asli dari index `cams-service-2026.11.13` di kedua cluster:
 
-### 2.1 Kesimpulan Kritis:
-1. **Kardinalitas Dokumen (1 Doc = 1 Transaksi Penuh)**:
-   - Satu dokumen Elasticsearch memuat **lengkap** baik request (`json_req`) maupun response (`json_resp`).
-   - Tidak ada dokumen request dan response yang terpisah.
-   - **Artinya: Setiap 1 dokumen = tepat 1 transaksi CAMS**. Perhitungan TPS aman dari risiko dobel hitungan.
+### 2.1 Perbandingan Skema: On-Premise (v2) vs Cloud (v3)
 
-2. **Field Timestamp**:
-   - Field waktu adalah: **`@timestamp`** (Format ISO 8601 UTC: `2026-11-13T02:03:16.419Z`).
-   - Sesuai dengan konfigurasi default: `ONPREM_TIMESTAMP_FIELD=@timestamp`.
+| Atribut / Field | On-Premise (`172.18.65.100`) | Cloud (`10.212.224.172`) | Penanganan di Go Aggregator |
+|---|---|---|---|
+| **Timestamp** | `@timestamp` (`2026-11-13T02:03:16.419Z`) | `@timestamp` (`2026-11-13T03:13:03.605Z`) | Identik, menggunakan field `@timestamp` |
+| **Versi CAMS** | `version`: `"v2"` | `version`: `"v3"` | Otomatis terdeteksi |
+| **Kode Respon Sukses** | `json_resp.ResponseCode`: `"00"` (PascalCase) | `json_resp.responseCode`: `"00"` (camelCase) | Aggregator query mendukung kedua varian case (`ResponseCode` & `responseCode`) |
+| **Status HTTP Respon** | - | `json_resp.status`: `"200"` | Aggregator query mendukung `status == "200"` |
+| **Keterangan Respon** | `json_resp.ResponseDesc`: `"SUKSES"` | `json_resp.responseDesc`: `"SUKSES"` | - |
+| **Kardinalitas** | 1 Doc = 1 Request + 1 Response | 1 Doc = 1 Request + 1 Response | Aman, **tidak ada risiko double counting** |
+| **IP Sumber / Host** | `host.name`, `ip` | `ip` | - |
 
-3. **Field Penentu Sukses vs Gagal**:
-   - Field respon utama: **`json_resp.ResponseCode`**.
-   - Transaksi Sukses: `json_resp.ResponseCode == "00"` (dengan `json_resp.ResponseDesc == "SUKSES"`).
-   - Transaksi Gagal: `json_resp.ResponseCode != "00"`.
+### 2.2 Cuplikan Sampel Dokumen Asli
 
-4. **Metrik Tambahan yang Tersedia**:
-   - Channel: `json_req.ChannelID` (contoh: `"ESB"`).
-   - Action / Fitur: `json_req.Action` (contoh: `"InquiryByNoKartu"`).
-   - Server Host: `host.name` (contoh: `"prd-gti-vm-cams-camap-bed-02"`).
+#### On-Premise (`discovery_results/onprem/06_sample_doc.json`):
+```json
+{
+  "_index": "cams-service-2026.11.13",
+  "_id": "6Uak0qEB_sEmQAgu4j11",
+  "_source": {
+    "@timestamp": "2026-11-13T02:03:16.419Z",
+    "version": "v2",
+    "ip": "172.27.27.150",
+    "json_req": {
+      "ChannelID": "ESB",
+      "Action": "InquiryByNoKartu",
+      "CardNo": "6013013657940263"
+    },
+    "json_resp": {
+      "ResponseCode": "00",
+      "ResponseDesc": "SUKSES"
+    }
+  }
+}
+```
+
+#### Cloud (`discovery_results/cloud/06_sample_doc.json`):
+```json
+{
+  "_index": "cams-service-2026.11.13",
+  "_id": "ORXl0qEBjyq2Lyq-FIw8",
+  "_source": {
+    "@timestamp": "2026-11-13T03:13:03.605Z",
+    "version": "v3",
+    "ip": "10.212.224.166",
+    "uri": "/000000000000000",
+    "json_resp": {
+      "status": "200",
+      "responseCode": "00",
+      "responseDesc": "SUKSES"
+    }
+  }
+}
+```
 
 ---
 
 ## 3. Catatan Autentikasi Kluster
 
-| Kluster | Host & Port | Akun Terverifikasi | Status |
+| Kluster | Host & Port | Akun Terverifikasi | Status Koneksi & Query |
 |---|---|---|---|
-| **On-Premise** | `http://172.18.65.100:9200` | `elastic` / `P@ssw0rd2020` | ✅ Terverifikasi & Sampel Dokumen Berhasil Diambil |
-| **Cloud** | `http://10.212.224.172:9200` | `elastic` / `P@ssw0rd2026` | ⚠️ Saat pengujian sebelumnya salah ketik menggunakan password On-Premise (`P@ssw0rd2020`). Gunakan `P@ssw0rd2026`. |
+| **On-Premise** | `http://172.18.65.100:9200` | `elastic` / `P@ssw0rd2020` | ✅ **SUKSES** (Cluster: `cao-cluster`, v7.7.0, dokumen berhasil diambil) |
+| **Cloud** | `http://10.212.224.172:9200` | `elastic` / `P@ssw0rd2026` | ✅ **SUKSES** (Dokumen v3 berhasil diambil setelah koreksi password) |
 
 ---
 
-## 4. Konfigurasi Produksi Rekomendasi (`.env`)
+## 4. Analisis Terkait `cams-apps-*`
+
+Berdasarkan daftar index yang aktif:
+- **`cams-apps-*`**:
+  - Di On-Premise memiliki volume tinggi (~7 juta docs/hari).
+  - Di Cloud **tidak aktif** (hanya ~200 dokumen di bulan Oktober).
+- **`cams-service-*`**:
+  - Aktif di **kedua cluster** (On-Premise: 2.9 juta/hari, Cloud: 835 ribu/hari).
+  - Merupakan core backend execution layer dari transaksi CAMS (memuat info kartu, inquiry, debit/credit, dsb).
+
+**Rekomendasi**:
+1. Gunakan **`cams-service-*`** sebagai index utama di Worker A (On-Premise) dan Worker B (Cloud). Ini menjamin keseragaman metrik TPS antara On-Premise dan Cloud.
+2. Jika ingin memverifikasi apa isi dari `cams-apps-*` On-Premise sebelum finalisasi, jalankan perintah berikut di server `172.24.81.99`:
+   ```bash
+   curl --noproxy "*" -u "elastic:P@ssw0rd2020" "http://172.18.65.100:9200/cams-apps-2026.11.13/_search?size=1&pretty"
+   ```
+
+---
+
+## 5. Konfigurasi Produksi Rekomendasi (`.env`)
 
 ```ini
 # Worker A: On-Premise
