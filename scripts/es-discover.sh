@@ -6,6 +6,11 @@
 
 set -euo pipefail
 
+# CRITICAL: Bypass corporate proxy (McAfee Web Gateway) for internal IP addresses
+unset http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY
+export no_proxy="*"
+export NO_PROXY="*"
+
 # 1. Automatically load credentials from .discovery.env or .env if present
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -f "${SCRIPT_DIR}/.discovery.env" ]; then
@@ -38,6 +43,7 @@ mkdir -p "${OUTPUT_DIR}"
 
 echo "=========================================================="
 echo " Starting Elasticsearch Discovery from $(hostname -I 2>/dev/null || hostname)"
+echo " Note: Corporate HTTP Proxy has been BYPASSED (--noproxy *)"
 echo " Target 1 (On-Premise): ${ES_ONPREM_HOST}"
 echo " Target 2 (Cloud):      ${ES_CLOUD_HOST}"
 echo " Output Directory:      ${OUTPUT_DIR}"
@@ -63,36 +69,42 @@ discover_cluster() {
 
     # 1. Cluster info & Version
     echo "  -> [1/6] Fetching cluster root info..."
-    curl -s -m 10 "${auth_header[@]}" "${endpoint}/" > "${dir}/01_cluster_info.json" || echo "FAILED"
+    curl --noproxy "*" -s -m 10 "${auth_header[@]}" "${endpoint}/" > "${dir}/01_cluster_info.json" || echo "FAILED"
     
+    # Check if intercepted by Proxy
+    if grep -iq "McAfee\|html" "${dir}/01_cluster_info.json" 2>/dev/null; then
+        echo "  [!] WARNING: Request was intercepted by Corporate Proxy or returned HTML instead of JSON!"
+        echo "      Verify direct network routing to ${endpoint}"
+    fi
+
     # 2. Cluster Health
     echo "  -> [2/6] Fetching cluster health..."
-    curl -s -m 10 "${auth_header[@]}" "${endpoint}/_cluster/health?pretty" > "${dir}/02_cluster_health.json" || echo "FAILED"
+    curl --noproxy "*" -s -m 10 "${auth_header[@]}" "${endpoint}/_cluster/health?pretty" > "${dir}/02_cluster_health.json" || echo "FAILED"
 
     # 3. List Indices
     echo "  -> [3/6] Fetching indices list..."
-    curl -s -m 10 "${auth_header[@]}" "${endpoint}/_cat/indices?v&s=index" > "${dir}/03_cat_indices.txt" || echo "FAILED"
+    curl --noproxy "*" -s -m 10 "${auth_header[@]}" "${endpoint}/_cat/indices?v&s=index" > "${dir}/03_cat_indices.txt" || echo "FAILED"
 
-    # 4. Search for transaction indices specifically
+    # 4. Filter Candidate Indices (exclude HTML tags if any)
     echo "  -> [4/6] Looking for transaction-related indices..."
-    grep -iE "trx|trans|cams|log|api|event" "${dir}/03_cat_indices.txt" > "${dir}/04_candidate_indices.txt" || true
+    grep -iE "trx|trans|cams|log|api|event" "${dir}/03_cat_indices.txt" | grep -v "<" > "${dir}/04_candidate_indices.txt" || true
 
-    # Extract top candidate index
+    # Extract top candidate index (must not start with HTML tag)
     local candidate_index
-    candidate_index=$(head -n 1 "${dir}/04_candidate_indices.txt" | awk '{print $3}' || true)
+    candidate_index=$(awk '{print $3}' "${dir}/04_candidate_indices.txt" | grep -v "^<" | head -n 1 || true)
 
     if [ -n "${candidate_index}" ]; then
         echo "  -> Sample candidate index found: ${candidate_index}"
         
         # 5. Fetch Mapping
         echo "  -> [5/6] Fetching mapping for ${candidate_index}..."
-        curl -s -m 10 "${auth_header[@]}" "${endpoint}/${candidate_index}/_mapping?pretty" > "${dir}/05_mapping_${candidate_index}.json" || echo "FAILED"
+        curl --noproxy "*" -s -m 10 "${auth_header[@]}" "${endpoint}/${candidate_index}/_mapping?pretty" > "${dir}/05_mapping_${candidate_index}.json" || echo "FAILED"
 
         # 6. Fetch 1 Sample Document
         echo "  -> [6/6] Fetching sample document from ${candidate_index}..."
-        curl -s -m 10 "${auth_header[@]}" "${endpoint}/${candidate_index}/_search?size=1&pretty" > "${dir}/06_sample_doc.json" || echo "FAILED"
+        curl --noproxy "*" -s -m 10 "${auth_header[@]}" "${endpoint}/${candidate_index}/_search?size=1&pretty" > "${dir}/06_sample_doc.json" || echo "FAILED"
     else
-        echo "  [!] No obvious transaction candidate index identified in _cat/indices. Please inspect 03_cat_indices.txt manually."
+        echo "  [!] No obvious transaction candidate index identified. Inspect 03_cat_indices.txt manually."
     fi
 
     echo "[✓] Finished probing ${name}. Results saved to ${dir}/"

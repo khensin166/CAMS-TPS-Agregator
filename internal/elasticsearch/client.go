@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -54,17 +55,30 @@ type HTTPClient struct {
 	httpClient *http.Client
 }
 
-// NewHTTPClient creates a new HTTPClient.
+// NewHTTPClient creates a new HTTPClient with direct internal transport (bypassing corporate proxies).
 func NewHTTPClient(baseURL, username, password string, timeout time.Duration) *HTTPClient {
 	if timeout <= 0 {
 		timeout = 15 * time.Second
 	}
+
+	transport := &http.Transport{
+		Proxy: nil, // Critical: direct connection to internal network, bypassing ambient HTTP_PROXY
+		DialContext: (&net.Dialer{
+			Timeout:   timeout,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 20,
+		IdleConnTimeout:     90 * time.Second,
+	}
+
 	return &HTTPClient{
 		baseURL:  strings.TrimRight(baseURL, "/"),
 		username: username,
 		password: password,
 		httpClient: &http.Client{
-			Timeout: timeout,
+			Transport: transport,
+			Timeout:   timeout,
 		},
 	}
 }
@@ -192,4 +206,3 @@ func (c *HTTPClient) setAuth(req *http.Request) {
 		req.SetBasicAuth(c.username, c.password)
 	}
 }
-
