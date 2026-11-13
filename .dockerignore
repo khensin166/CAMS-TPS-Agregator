@@ -1,13 +1,55 @@
-.git
+# ==============================================================================
+# Docker Build Ignore File (.dockerignore)
+# Ensures zero bloat: only minimal source code is sent to the Docker daemon
+# ==============================================================================
+
+# Version Control & CI/CD
+.git/
 .gitignore
-.env
-*.local.env
-*.prod.env
-bin/
-*.exe
-*.test
-*.out
-discovery_results/
+.gitattributes
+.github/
+
+# IDE & Editor files
 .idea/
 .vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
 
+# Documentation, Diagrams, & Markdown Files (Never needed in container image)
+docs/
+*.md
+README.md
+
+# Automation & Verification Scripts
+scripts/
+
+# Integration Tests & Load Simulation
+tests/
+
+# Dashboard Templates & Sample Configurations
+grafana/
+configs/
+deployments/
+
+# Discovery Dumps & Sample Documents
+discovery_results/
+*.json.bak
+
+# Local Environment & Credential Files
+.env
+*.env
+*.local.env
+*.prod.env
+.discovery.env
+
+# Local Binaries, Logs, & Test Artifacts
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.log
