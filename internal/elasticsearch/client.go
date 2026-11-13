@@ -112,6 +112,20 @@ func (c *HTTPClient) Query1sHistogram(ctx context.Context, indexPattern string, 
 	startISO := startTime.UTC().Format(time.RFC3339)
 	endISO := endTime.UTC().Format(time.RFC3339)
 
+	// Valid success conditions verified against CAMS Elasticsearch schema:
+	// 1. json_resp.ResponseCode == "00" (Primary CAMS service code)
+	// 2. status == "SUCCESS" or "00"
+	// 3. response_code == "00"
+	// 4. http_status in [200, 300)
+	successConditions := []map[string]interface{}{
+		{"term": map[string]interface{}{"json_resp.ResponseCode.keyword": "00"}},
+		{"term": map[string]interface{}{"json_resp.ResponseCode": "00"}},
+		{"term": map[string]interface{}{"status": "SUCCESS"}},
+		{"term": map[string]interface{}{"status": "00"}},
+		{"term": map[string]interface{}{"response_code": "00"}},
+		{"range": map[string]interface{}{"http_status": map[string]interface{}{"gte": 200, "lt": 300}}},
+	}
+
 	query := map[string]interface{}{
 		"size": 0,
 		"query": map[string]interface{}{
@@ -143,24 +157,14 @@ func (c *HTTPClient) Query1sHistogram(ctx context.Context, indexPattern string, 
 					"success": map[string]interface{}{
 						"filter": map[string]interface{}{
 							"bool": map[string]interface{}{
-								"should": []map[string]interface{}{
-									{"term": map[string]interface{}{"status": "SUCCESS"}},
-									{"term": map[string]interface{}{"status": "00"}},
-									{"term": map[string]interface{}{"response_code": "00"}},
-									{"range": map[string]interface{}{"http_status": map[string]interface{}{"gte": 200, "lt": 300}}},
-								},
+								"should": successConditions,
 							},
 						},
 					},
 					"failed": map[string]interface{}{
 						"filter": map[string]interface{}{
 							"bool": map[string]interface{}{
-								"must_not": []map[string]interface{}{
-									{"term": map[string]interface{}{"status": "SUCCESS"}},
-									{"term": map[string]interface{}{"status": "00"}},
-									{"term": map[string]interface{}{"response_code": "00"}},
-									{"range": map[string]interface{}{"http_status": map[string]interface{}{"gte": 200, "lt": 300}}},
-								},
+								"must_not": successConditions,
 							},
 						},
 					},
