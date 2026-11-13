@@ -1,0 +1,12 @@
+.git
+.gitignore
+.env
+*.local.env
+*.prod.env
+bin/
+*.exe
+*.test
+*.out
+discovery_results/
+.idea/
+.vscode/

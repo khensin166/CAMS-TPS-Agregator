@@ -1,0 +1,36 @@
+version: '3.8'
+
+# ==============================================================================
+# Production Docker Compose for CAMS TPS Monitoring System
+# Host: 172.24.81.99 (Runs alongside existing Grafana container)
+# ==============================================================================
+
+services:
+  tps-aggregator:
+    image: ghcr.io/khensin166/cams-tps-aggregator:latest
+    container_name: cams-tps-aggregator
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      # Exposes Prometheus metrics & health endpoints to internal monitoring
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
