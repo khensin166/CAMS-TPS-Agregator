@@ -52,3 +52,4 @@ HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --spider -q http://localhost:8080/health || exit 1
 
 ENTRYPOINT ["/usr/local/bin/aggregator"]
+
