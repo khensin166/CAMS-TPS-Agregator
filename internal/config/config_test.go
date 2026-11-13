@@ -23,12 +23,12 @@ func TestLoadConfig_Defaults(t *testing.T) {
 		t.Errorf("expected Database to be CAMS_Monitoring, got: %s", cfg.Database.Database)
 	}
 
-	if cfg.OnPrem.PollInterval != 10*time.Second {
-		t.Errorf("expected OnPrem.PollInterval to be 10s, got: %v", cfg.OnPrem.PollInterval)
+	if cfg.OnPrem.PollInterval != 30*time.Second {
+		t.Errorf("expected OnPrem.PollInterval to be 30s, got: %v", cfg.OnPrem.PollInterval)
 	}
 
-	if cfg.Cloud.WatermarkDelay != 60*time.Second {
-		t.Errorf("expected Cloud.WatermarkDelay to be 60s, got: %v", cfg.Cloud.WatermarkDelay)
+	if cfg.Cloud.WatermarkDelay != 30*time.Second {
+		t.Errorf("expected Cloud.WatermarkDelay to be 30s, got: %v", cfg.Cloud.WatermarkDelay)
 	}
 
 	if cfg.App.Location == nil || cfg.App.Location.String() != "Asia/Jakarta" {
