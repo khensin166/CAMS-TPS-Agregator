@@ -88,22 +88,38 @@ Berdasarkan sampel dokumen asli dari index `cams-service-2026.11.13` di kedua cl
 
 ---
 
-## 4. Analisis Terkait `cams-apps-*`
+## 4. Analisis Terkait `cams-apps-*` vs `cams-service-*`
 
-Berdasarkan daftar index yang aktif:
-- **`cams-apps-*`**:
-  - Di On-Premise memiliki volume tinggi (~7 juta docs/hari).
-  - Di Cloud **tidak aktif** (hanya ~200 dokumen di bulan Oktober).
-- **`cams-service-*`**:
-  - Aktif di **kedua cluster** (On-Premise: 2.9 juta/hari, Cloud: 835 ribu/hari).
-  - Merupakan core backend execution layer dari transaksi CAMS (memuat info kartu, inquiry, debit/credit, dsb).
+Dari hasil inspeksi sampel dokumen nyata `cams-apps-2026.11.13` (On-Premise) dan `cams-apps-2026.10.29` (Cloud), ditemukan arsitektur yang sangat jelas:
 
-**Rekomendasi**:
-1. Gunakan **`cams-service-*`** sebagai index utama di Worker A (On-Premise) dan Worker B (Cloud). Ini menjamin keseragaman metrik TPS antara On-Premise dan Cloud.
-2. Jika ingin memverifikasi apa isi dari `cams-apps-*` On-Premise sebelum finalisasi, jalankan perintah berikut di server `172.24.81.99`:
-   ```bash
-   curl --noproxy "*" -u "elastic:P@ssw0rd2020" "http://172.18.65.100:9200/cams-apps-2026.11.13/_search?size=1&pretty"
-   ```
+### 4.1 Perbandingan Karakteristik Dua Kanal CAMS:
+
+| Parameter | `cams-apps-*` (Kanal ISO 8583) | `cams-service-*` (Kanal REST/JSON API) |
+|---|---|---|
+| **Fungsi / Peran** | **ISO Router Engine** untuk ATM, EDC, BRILink | **Backend Service API** untuk Mobile Banking, Web, ESB |
+| **Log Source / Binary** | `/u/bricam/cam/apps/APR/isorouter.*` | `/u/bricam/cam/service/RESP/*` |
+| **Field Timestamp** | `@timestamp` (`2026-11-13T01:17:10.070Z`) | `@timestamp` (`2026-11-13T02:03:16.419Z`) |
+| **Field Respon Sukses** | **`response_code == "00"`** (Root level) | **`json_resp.ResponseCode == "00"`** (On-Prem) / **`responseCode == "00"`** (Cloud) |
+| **Identitas Transaksi** | `iso: "200"`, `termid`, `proccode`, `cardno` | `ChannelID: "ESB"`, `Action: "InquiryByNoKartu"` |
+| **Status di Cloud** | Identik (`/u/bricam/cam/apps/APR/isorouter.*`), saat ini sedang di-stop/standby | Aktif melayani transaksi harian |
+
+### 4.2 Kesimpulan:
+1. `cams-apps` dan `cams-service` **BUKAN duplikat**, melainkan **dua kanal transaksi yang saling melengkapi**:
+   - `cams-apps` melayani transaksi berbasis ISO 8583 (ATM, EDC, Merchant).
+   - `cams-service` melayani transaksi berbasis JSON/REST API (ESB, Inquiry, Digital).
+2. Di Cloud, path log aplikasi juga mengarah ke `isorouter` (`/u/bricam/cam/apps/APR/isorouter.1865140`). Artinya begitu CAMS Apps di Cloud diaktifkan kembali, formatnya akan **persis sama 100%** dengan On-Premise.
+3. **Pilihan Konfigurasi Pattern Index**:
+   - **Opsi Rekomendasi (Semua Kanal Tergabung Total TPS)**:
+     ```ini
+     ONPREM_INDEX_PATTERN=cams-service-*,cams-apps-*
+     CLOUD_INDEX_PATTERN=cams-service-*,cams-apps-*
+     ```
+     Dengan pattern ini, TPS On-Premise akan mencakup total transaksi ISO ATM/EDC (~7M/hari) + API ESB (~3M/hari) = ~10M transaksi/hari. Dan ketika Cloud Apps hidup, Cloud TPS akan otomatis langsung membaca log ISO tanpa perlu restart atau perubahan konfigurasi lagi!
+   - **Opsi Alternatif (Hanya Service API)**:
+     ```ini
+     ONPREM_INDEX_PATTERN=cams-service-*
+     CLOUD_INDEX_PATTERN=cams-service-*
+     ```
 
 ---
 

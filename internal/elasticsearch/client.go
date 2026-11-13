@@ -113,11 +113,11 @@ func (c *HTTPClient) Query1sHistogram(ctx context.Context, indexPattern string, 
 	endISO := endTime.UTC().Format(time.RFC3339)
 
 	// Valid success conditions verified against CAMS Elasticsearch schema:
-	// 1. json_resp.ResponseCode == "00" (On-Premise CAMS v2)
-	// 2. json_resp.responseCode == "00" (Cloud CAMS v3)
+	// 1. json_resp.ResponseCode == "00" (On-Premise CAMS v2 REST/JSON API)
+	// 2. json_resp.responseCode == "00" (Cloud CAMS v3 REST/JSON API)
 	// 3. json_resp.status == "200" (Cloud HTTP status in json_resp)
-	// 4. status == "SUCCESS" or "00"
-	// 5. response_code == "00"
+	// 4. response_code == "00" (CAMS Apps ISO 8583 router for ATM/EDC/BRILink)
+	// 5. status == "SUCCESS" or "00"
 	// 6. http_status in [200, 300)
 	successConditions := []map[string]interface{}{
 		{"term": map[string]interface{}{"json_resp.ResponseCode.keyword": "00"}},
@@ -126,9 +126,10 @@ func (c *HTTPClient) Query1sHistogram(ctx context.Context, indexPattern string, 
 		{"term": map[string]interface{}{"json_resp.responseCode": "00"}},
 		{"term": map[string]interface{}{"json_resp.status.keyword": "200"}},
 		{"term": map[string]interface{}{"json_resp.status": "200"}},
+		{"term": map[string]interface{}{"response_code.keyword": "00"}},
+		{"term": map[string]interface{}{"response_code": "00"}},
 		{"term": map[string]interface{}{"status": "SUCCESS"}},
 		{"term": map[string]interface{}{"status": "00"}},
-		{"term": map[string]interface{}{"response_code": "00"}},
 		{"range": map[string]interface{}{"http_status": map[string]interface{}{"gte": 200, "lt": 300}}},
 	}
 
