@@ -61,3 +61,4 @@ func ProcessAggregationResponse(
 
 	return records, nil
 }
+
