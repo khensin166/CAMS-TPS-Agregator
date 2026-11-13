@@ -46,16 +46,17 @@ func (d DatabaseConfig) ConnectionString() string {
 
 // WorkerConfig holds independent configuration for an Elasticsearch poller.
 type WorkerConfig struct {
-	Enabled        bool
-	SourceName     string
-	URL            string
-	User           string
-	Password       string
-	IndexPattern   string
-	TimestampField string
-	PollInterval   time.Duration
-	WatermarkDelay time.Duration
-	OverlapWindow  time.Duration
+	Enabled         bool
+	SourceName      string
+	URL             string
+	User            string
+	Password        string
+	IndexPattern    string
+	TimestampField  string
+	PollInterval    time.Duration
+	WatermarkDelay  time.Duration
+	OverlapWindow   time.Duration
+	RetentionPeriod time.Duration
 }
 
 // LoadConfig loads configuration from environment variables with sensible defaults.
@@ -86,28 +87,30 @@ func LoadConfig() (*Config, error) {
 			CommandTimeout:  getEnvDuration("DB_COMMAND_TIMEOUT", 30*time.Second),
 		},
 		OnPrem: WorkerConfig{
-			Enabled:        getEnvBool("ONPREM_ENABLED", true),
-			SourceName:     getEnv("ONPREM_SOURCE_NAME", "onprem"),
-			URL:            getEnv("ONPREM_ES_URL", "http://172.18.65.100:9200"),
-			User:           getEnv("ONPREM_ES_USER", ""),
-			Password:       getEnv("ONPREM_ES_PASSWORD", ""),
-			IndexPattern:   getEnv("ONPREM_INDEX_PATTERN", "cams-transactions-*"),
-			TimestampField: getEnv("ONPREM_TIMESTAMP_FIELD", "@timestamp"),
-			PollInterval:   getEnvDuration("ONPREM_POLL_INTERVAL", 10*time.Second),
-			WatermarkDelay: getEnvDuration("ONPREM_WATERMARK_DELAY", 60*time.Second),
-			OverlapWindow:  getEnvDuration("ONPREM_OVERLAP_WINDOW", 120*time.Second),
+			Enabled:         getEnvBool("ONPREM_ENABLED", true),
+			SourceName:      getEnv("ONPREM_SOURCE_NAME", "onprem"),
+			URL:             getEnv("ONPREM_ES_URL", "http://172.18.65.100:9200"),
+			User:            getEnv("ONPREM_ES_USER", ""),
+			Password:        getEnv("ONPREM_ES_PASSWORD", ""),
+			IndexPattern:    getEnv("ONPREM_INDEX_PATTERN", "cams-transactions-*"),
+			TimestampField:  getEnv("ONPREM_TIMESTAMP_FIELD", "@timestamp"),
+			PollInterval:    getEnvDuration("ONPREM_POLL_INTERVAL", 10*time.Second),
+			WatermarkDelay:  getEnvDuration("ONPREM_WATERMARK_DELAY", 60*time.Second),
+			OverlapWindow:   getEnvDuration("ONPREM_OVERLAP_WINDOW", 120*time.Second),
+			RetentionPeriod: getEnvDuration("ONPREM_RETENTION_PERIOD", 7*24*time.Hour),
 		},
 		Cloud: WorkerConfig{
-			Enabled:        getEnvBool("CLOUD_ENABLED", true),
-			SourceName:     getEnv("CLOUD_SOURCE_NAME", "cloud"),
-			URL:            getEnv("CLOUD_ES_URL", "http://10.212.224.172:9200"),
-			User:           getEnv("CLOUD_ES_USER", ""),
-			Password:       getEnv("CLOUD_ES_PASSWORD", ""),
-			IndexPattern:   getEnv("CLOUD_INDEX_PATTERN", "cams-transactions-*"),
-			TimestampField: getEnv("CLOUD_TIMESTAMP_FIELD", "@timestamp"),
-			PollInterval:   getEnvDuration("CLOUD_POLL_INTERVAL", 10*time.Second),
-			WatermarkDelay: getEnvDuration("CLOUD_WATERMARK_DELAY", 60*time.Second),
-			OverlapWindow:  getEnvDuration("CLOUD_OVERLAP_WINDOW", 120*time.Second),
+			Enabled:         getEnvBool("CLOUD_ENABLED", true),
+			SourceName:      getEnv("CLOUD_SOURCE_NAME", "cloud"),
+			URL:             getEnv("CLOUD_ES_URL", "http://10.212.224.172:9200"),
+			User:            getEnv("CLOUD_ES_USER", ""),
+			Password:        getEnv("CLOUD_ES_PASSWORD", ""),
+			IndexPattern:    getEnv("CLOUD_INDEX_PATTERN", "cams-transactions-*"),
+			TimestampField:  getEnv("CLOUD_TIMESTAMP_FIELD", "@timestamp"),
+			PollInterval:    getEnvDuration("CLOUD_POLL_INTERVAL", 10*time.Second),
+			WatermarkDelay:  getEnvDuration("CLOUD_WATERMARK_DELAY", 60*time.Second),
+			OverlapWindow:   getEnvDuration("CLOUD_OVERLAP_WINDOW", 120*time.Second),
+			RetentionPeriod: getEnvDuration("CLOUD_RETENTION_PERIOD", 7*24*time.Hour),
 		},
 	}
 
@@ -147,4 +150,3 @@ func getEnvDuration(key string, defaultVal time.Duration) time.Duration {
 	}
 	return defaultVal
 }
-

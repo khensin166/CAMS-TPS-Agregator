@@ -269,3 +269,4 @@ func (r *SQLRepository) LogWorkerEvent(ctx context.Context, sourceName, eventTyp
 
 	return nil
 }
+

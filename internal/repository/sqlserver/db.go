@@ -91,3 +91,4 @@ func RunMigrations(ctx context.Context, db *sql.DB, migrationsDir string, log *s
 	log.Info("All database schema migrations applied successfully", slog.Int("count", len(sqlFiles)))
 	return nil
 }
+

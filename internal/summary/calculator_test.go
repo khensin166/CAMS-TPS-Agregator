@@ -90,3 +90,4 @@ func TestCalculator_StartPeriodicRollup_Cancellation(t *testing.T) {
 		t.Errorf("expected at least initial summary calculation before timeout")
 	}
 }
+

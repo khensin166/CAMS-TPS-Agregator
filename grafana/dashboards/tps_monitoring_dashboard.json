@@ -1,0 +1,208 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": true,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Real-Time TPS Status",
+      "type": "row"
+    },
+    {
+      "id": 1,
+      "title": "On-Premise Real-Time TPS",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "datasource": { "type": "mssql", "uid": "mssql-cams" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 500 },
+              { "color": "red", "value": 900 }
+            ]
+          },
+          "unit": "reqps"
+        }
+      },
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" }
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT TOP 1 metric_time AS time, total_transactions AS value FROM dbo.tps_metrics WHERE source_name = 'onprem' ORDER BY metric_time DESC;",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Cloud Real-Time TPS",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "datasource": { "type": "mssql", "uid": "mssql-cams" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 500 },
+              { "color": "red", "value": 900 }
+            ]
+          },
+          "unit": "reqps"
+        }
+      },
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" }
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT TOP 1 metric_time AS time, total_transactions AS value FROM dbo.tps_metrics WHERE source_name = 'cloud' ORDER BY metric_time DESC;",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "On-Premise Checkpoint Lag",
+      "type": "gauge",
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 1 },
+      "datasource": { "type": "mssql", "uid": "mssql-cams" },
+      "fieldConfig": {
+        "defaults": {
+          "max": 600,
+          "min": 0,
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 120 },
+              { "color": "red", "value": 300 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT DATEDIFF(second, last_processed_until, SYSUTCDATETIME()) AS lag_seconds FROM dbo.tps_checkpoints WHERE source_name = 'onprem';",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Cloud Checkpoint Lag",
+      "type": "gauge",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
+      "datasource": { "type": "mssql", "uid": "mssql-cams" },
+      "fieldConfig": {
+        "defaults": {
+          "max": 600,
+          "min": 0,
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 120 },
+              { "color": "red", "value": 300 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT DATEDIFF(second, last_processed_until, SYSUTCDATETIME()) AS lag_seconds FROM dbo.tps_checkpoints WHERE source_name = 'cloud';",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "id": 101,
+      "title": "Historical 1-Second Time Series",
+      "type": "row"
+    },
+    {
+      "id": 5,
+      "title": "TPS Metrics Time Series (1s Granularity)",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 7 },
+      "datasource": { "type": "mssql", "uid": "mssql-cams" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 15
+          },
+          "unit": "reqps"
+        }
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT metric_time AS time, total_transactions AS [On-Prem Total], success_transactions AS [On-Prem Success], failed_transactions AS [On-Prem Failed] FROM dbo.tps_metrics WHERE source_name = 'onprem' AND metric_time >= $__timeFrom() AND metric_time <= $__timeTo() ORDER BY metric_time ASC;",
+          "refId": "OnPrem",
+          "format": "time_series"
+        },
+        {
+          "rawSql": "SELECT metric_time AS time, total_transactions AS [Cloud Total], success_transactions AS [Cloud Success], failed_transactions AS [Cloud Failed] FROM dbo.tps_metrics WHERE source_name = 'cloud' AND metric_time >= $__timeFrom() AND metric_time <= $__timeTo() ORDER BY metric_time ASC;",
+          "refId": "Cloud",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "id": 102,
+      "title": "Periodic Summaries (Daily / Weekly / Monthly)",
+      "type": "row"
+    },
+    {
+      "id": 6,
+      "title": "TPS Summaries (Calendar Based - Asia/Jakarta)",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 17 },
+      "datasource": { "type": "mssql", "uid": "mssql-cams" },
+      "targets": [
+        {
+          "rawSql": "SELECT source_name AS [Source], period_type AS [Period Type], DATEADD(hour, 7, period_start) AS [Period Start (WIB)], DATEADD(hour, 7, period_end) AS [Period End (WIB)], min_tps AS [Min TPS], max_tps AS [Max TPS], avg_tps AS [Avg TPS], total_transactions AS [Total Transactions], DATEADD(hour, 7, calculated_at) AS [Calculated (WIB)] FROM dbo.tps_summary ORDER BY period_start DESC, source_name ASC;",
+          "refId": "Summary",
+          "format": "table"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["tps", "cams", "monitoring", "sqlserver"],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m"]
+  },
+  "timezone": "browser",
+  "title": "CAMS TPS Monitoring Dashboard"
+}

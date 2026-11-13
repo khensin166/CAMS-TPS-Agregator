@@ -13,3 +13,4 @@ BEGIN
         CONSTRAINT PK_tps_checkpoints PRIMARY KEY CLUSTERED (source_name, index_pattern)
     );
 END;
+

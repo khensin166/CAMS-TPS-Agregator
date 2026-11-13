@@ -23,3 +23,4 @@ BEGIN
     ON dbo.tps_metrics (source_name, metric_time) 
     INCLUDE (total_transactions, success_transactions, failed_transactions);
 END;
+

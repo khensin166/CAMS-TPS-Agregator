@@ -77,6 +77,7 @@ func (w *Worker) Start(ctx context.Context) {
 		slog.Duration("poll_interval", w.cfg.PollInterval),
 		slog.Duration("watermark_delay", w.cfg.WatermarkDelay),
 		slog.Duration("overlap_window", w.cfg.OverlapWindow),
+		slog.Duration("retention_period", w.cfg.RetentionPeriod),
 	)
 
 	if w.metrics != nil {
@@ -149,7 +150,7 @@ func (w *Worker) pollOnce(ctx context.Context) {
 
 	queryStart := w.currentWatermark.Add(-w.cfg.OverlapWindow).Truncate(time.Second)
 
-	// Check if we are recovering (lag > 5 minutes)
+	// 1. Monitor Processing Lag & Recovery State
 	lagSeconds := int64(now.Sub(w.currentWatermark).Seconds())
 	isRecovering := lagSeconds > 300
 	if w.metrics != nil {
@@ -158,6 +159,20 @@ func (w *Worker) pollOnce(ctx context.Context) {
 			val = 1.0
 		}
 		w.metrics.RecoveryMode.WithLabelValues(w.cfg.SourceName).Set(val)
+
+		// 2. Data-Loss Risk Detection
+		if w.cfg.RetentionPeriod > 0 && lagSeconds > int64(w.cfg.RetentionPeriod.Seconds()) {
+			w.metrics.DataLossRisk.WithLabelValues(w.cfg.SourceName).Set(1.0)
+			w.logger.Error("CRITICAL: Processing watermark exceeds Elasticsearch retention window! Potential permanent data loss!",
+				slog.Int64("lag_seconds", lagSeconds),
+				slog.Duration("retention_window", w.cfg.RetentionPeriod),
+				slog.Time("watermark", w.currentWatermark),
+			)
+			lagInt := int(lagSeconds)
+			_ = w.repo.LogWorkerEvent(ctx, w.cfg.SourceName, "DATA_LOSS_RISK", "Processing watermark exceeds retention window", &lagInt)
+		} else {
+			w.metrics.DataLossRisk.WithLabelValues(w.cfg.SourceName).Set(0.0)
+		}
 	}
 
 	w.logger.Debug("Executing aggregation query",
@@ -166,7 +181,7 @@ func (w *Worker) pollOnce(ctx context.Context) {
 		slog.Int64("lag_seconds", lagSeconds),
 	)
 
-	// 1. Query Elasticsearch
+	// 3. Query Elasticsearch
 	aggResp, err := w.esClient.Query1sHistogram(ctx, w.cfg.IndexPattern, queryStart, targetEnd, w.cfg.TimestampField)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -176,14 +191,14 @@ func (w *Worker) pollOnce(ctx context.Context) {
 		return
 	}
 
-	// 2. Parse Aggregation Buckets
+	// 4. Parse Aggregation Buckets
 	records, err := ProcessAggregationResponse(w.appName, w.cfg.SourceName, aggResp, queryStart, targetEnd)
 	if err != nil {
 		w.handleProcessingError(err, lagSeconds)
 		return
 	}
 
-	// 3. Atomically Save Metrics and Advance Checkpoint
+	// 5. Atomically Save Metrics and Advance Checkpoint
 	newCheckpoint := repository.Checkpoint{
 		SourceName:         w.cfg.SourceName,
 		IndexPattern:       w.cfg.IndexPattern,
@@ -200,7 +215,7 @@ func (w *Worker) pollOnce(ctx context.Context) {
 		return
 	}
 
-	// 4. Successful Commit: Advance local state and emit metrics
+	// 6. Successful Commit: Advance local state and emit metrics
 	w.currentWatermark = targetEnd
 	w.consecutiveErrors = 0
 	duration := time.Since(startTime).Seconds()

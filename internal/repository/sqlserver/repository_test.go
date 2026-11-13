@@ -203,3 +203,4 @@ func TestSQLRepository_CalculateAndSaveSummary(t *testing.T) {
 		t.Errorf("unfulfilled expectations: %v", err)
 	}
 }
+

@@ -122,3 +122,4 @@ func (c *Calculator) StartPeriodicRollup(ctx context.Context, interval time.Dura
 		}
 	}
 }
+

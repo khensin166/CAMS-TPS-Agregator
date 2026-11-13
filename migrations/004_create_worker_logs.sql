@@ -19,3 +19,4 @@ BEGIN
     CREATE NONCLUSTERED INDEX IX_tps_worker_logs_source_time 
     ON dbo.tps_worker_logs (source_name, created_at);
 END;
+

@@ -18,3 +18,4 @@ BEGIN
         CONSTRAINT PK_tps_summary PRIMARY KEY CLUSTERED (application_name, source_name, period_type, period_start)
     );
 END;
+

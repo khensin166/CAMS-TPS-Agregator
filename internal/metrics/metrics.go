@@ -12,6 +12,7 @@ type Metrics struct {
 	ProcessingLag        *prometheus.GaugeVec
 	CurrentTPS           *prometheus.GaugeVec
 	RecoveryMode         *prometheus.GaugeVec
+	DataLossRisk         *prometheus.GaugeVec
 	QueryErrors          *prometheus.CounterVec
 	RecordsProcessed     *prometheus.CounterVec
 	DatabaseErrors       *prometheus.CounterVec
@@ -62,6 +63,13 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 			},
 			[]string{"source"},
 		),
+		DataLossRisk: factory.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "tps_aggregator_data_loss_risk",
+				Help: "Indicates whether the processing watermark has exceeded the Elasticsearch retention period (1 = risk of permanent data loss, 0 = safe).",
+			},
+			[]string{"source"},
+		),
 		QueryErrors: factory.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "tps_aggregator_query_errors_total",
@@ -95,4 +103,3 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 
 	return m
 }
-

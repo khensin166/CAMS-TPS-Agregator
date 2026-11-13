@@ -19,6 +19,7 @@ type mockRepository struct {
 	mu           sync.Mutex
 	checkpoints  map[string]*repository.Checkpoint
 	metricsSaved []repository.MetricRecord
+	loggedEvents []repository.WorkerLog
 	failSave     bool
 }
 
@@ -59,6 +60,15 @@ func (m *mockRepository) CalculateAndSaveSummary(ctx context.Context, appName, s
 }
 
 func (m *mockRepository) LogWorkerEvent(ctx context.Context, sourceName, eventType, message string, lagSeconds *int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.loggedEvents = append(m.loggedEvents, repository.WorkerLog{
+		SourceName: sourceName,
+		EventType:  eventType,
+		Message:    message,
+		LagSeconds: lagSeconds,
+		CreatedAt:  time.Now().UTC(),
+	})
 	return nil
 }
 
@@ -180,6 +190,59 @@ func TestWorker_DatabaseFailureRetainsCheckpoint(t *testing.T) {
 	health.mu.Unlock()
 	if status != "DEGRADED" {
 		t.Errorf("expected worker status DEGRADED on DB failure, got %s", status)
+	}
+}
+
+func TestWorker_DataLossRiskDetection(t *testing.T) {
+	mockES := elasticsearch.NewMockServer(false, "", "")
+	defer mockES.Close()
+
+	now := time.Now().UTC().Truncate(time.Second)
+	// Watermark is 10 days ago, while retention is 7 days
+	oldWatermark := now.Add(-10 * 24 * time.Hour)
+
+	repo := newMockRepository()
+	repo.checkpoints["onprem:cams-*"] = &repository.Checkpoint{
+		SourceName:         "onprem",
+		IndexPattern:       "cams-*",
+		LastProcessedUntil: oldWatermark,
+	}
+
+	cfg := config.WorkerConfig{
+		Enabled:         true,
+		SourceName:      "onprem",
+		IndexPattern:    "cams-*",
+		PollInterval:    50 * time.Millisecond,
+		WatermarkDelay:  60 * time.Second,
+		OverlapWindow:   120 * time.Second,
+		RetentionPeriod: 7 * 24 * time.Hour,
+	}
+
+	esClient := elasticsearch.NewHTTPClient(mockES.URL(), "", "", 2*time.Second)
+	reg := prometheus.NewRegistry()
+	promMetrics := metrics.NewMetrics(reg)
+	health := &mockHealthReporter{}
+
+	worker := NewWorker("CAMS", cfg, esClient, repo, promMetrics, health, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+
+	worker.Start(ctx)
+
+	// Verify that DataLossRisk log was created
+	repo.mu.Lock()
+	hasDataLossLog := false
+	for _, l := range repo.loggedEvents {
+		if l.EventType == "DATA_LOSS_RISK" {
+			hasDataLossLog = true
+			break
+		}
+	}
+	repo.mu.Unlock()
+
+	if !hasDataLossLog {
+		t.Errorf("expected DATA_LOSS_RISK log event to be recorded when lag > retention")
 	}
 }
 
