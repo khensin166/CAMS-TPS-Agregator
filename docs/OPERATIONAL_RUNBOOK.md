@@ -103,3 +103,4 @@ ORDER BY created_at DESC;
 | Query Error Rate | `rate(tps_aggregator_query_errors_total[5m])` | `> 0` |
 | Database Error Rate | `rate(tps_aggregator_database_errors_total[5m])` | `> 0` |
 | Data-Loss Risk | `tps_aggregator_data_loss_risk` | `> 0` |
+
